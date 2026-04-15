@@ -21,7 +21,8 @@ class GeolocationController extends Controller
 
         try {
             // Free IP geolocation API (no API key required for basic usage)
-            $response = Http::get("http://ip-api.com/json/{$ip}");
+            // Using HTTPS for better security when deployed
+            $response = Http::get("https://ip-api.com/json/{$ip}");
             
             if ($response->successful() && $response->json()['status'] === 'success') {
                 $data = $response->json();
@@ -118,27 +119,57 @@ class GeolocationController extends Controller
 
         try {
             // OpenStreetMap Nominatim Reverse Geocoding (free, no API key required)
+            // Using detailed format to get street-level information
             $response = Http::withHeaders([
-                'User-Agent' => 'LaravelGeolocationApp/1.0'
+                'User-Agent' => 'TimeMark Location App/1.0 (https://github.com/timemark-app)'
             ])->get('https://nominatim.openstreetmap.org/reverse', [
                 'lat' => $request->input('latitude'),
                 'lon' => $request->input('longitude'),
-                'format' => 'json'
+                'format' => 'json',
+                'addressdetails' => 1,
+                'extratags' => 1,
+                'namedetails' => 1
             ]);
 
             if ($response->successful() && isset($response->json()['display_name'])) {
                 $data = $response->json();
-                
+                $address = $data['address'] ?? [];
+
+                // Extract street-level details
+                $street = $address['road'] ?? '';
+                $houseNumber = $address['house_number'] ?? '';
+                $neighbourhood = $address['neighbourhood'] ?? $address['suburb'] ?? '';
+                $quarter = $address['quarter'] ?? '';
+
+                // Build full street address
+                $streetAddress = trim("{$houseNumber} {$street}");
+                if (empty($streetAddress)) {
+                    $streetAddress = $neighbourhood ?: $quarter ?: '';
+                }
+
                 return response()->json([
                     'success' => true,
                     'data' => [
                         'address' => $data['display_name'] ?? '',
+                        'street' => $street,
+                        'house_number' => $houseNumber,
+                        'street_address' => $streetAddress,
+                        'neighbourhood' => $neighbourhood,
+                        'quarter' => $quarter,
+                        'city' => $address['city'] ?? $address['town'] ?? $address['village'] ?? $address['hamlet'] ?? '',
+                        'county' => $address['county'] ?? '',
+                        'state' => $address['state'] ?? '',
+                        'country' => $address['country'] ?? '',
+                        'country_code' => $address['country_code'] ?? '',
+                        'postcode' => $address['postcode'] ?? '',
                         'latitude' => $data['lat'] ?? 0,
                         'longitude' => $data['lon'] ?? 0,
-                        'city' => $data['address']['city'] ?? $data['address']['town'] ?? $data['address']['village'] ?? '',
-                        'state' => $data['address']['state'] ?? '',
-                        'country' => $data['address']['country'] ?? '',
-                        'postcode' => $data['address']['postcode'] ?? '',
+                        'place_id' => $data['place_id'] ?? '',
+                        'osm_type' => $data['osm_type'] ?? '',
+                        'osm_id' => $data['osm_id'] ?? '',
+                        'place_rank' => $data['place_rank'] ?? 0,
+                        'type' => $data['type'] ?? '',
+                        'importance' => $data['importance'] ?? 0,
                     ]
                 ]);
             }
