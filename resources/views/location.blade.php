@@ -4,413 +4,322 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TimeMark - Location Tracker</title>
-    
-    <!-- Leaflet CSS for interactive map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f7;
+            background: #f0f2f5;
             min-height: 100vh;
-            padding: 20px;
         }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
+        .app-container { max-width: 100%; margin: 0 auto; }
+        
+        .map-section {
+            position: relative;
+            height: 40vh;
+            min-height: 300px;
+            background: #e5e5e5;
         }
-        .header {
-            text-align: center;
-            padding: 30px 0;
-        }
-        .logo {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #1a1a1a;
-        }
-        .logo span {
-            color: #007aff;
-        }
-        .current-time {
-            font-size: 1.1rem;
-            color: #666;
-            margin-top: 5px;
-        }
-        .status-card {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            margin-bottom: 20px;
-        }
-        .status-indicator {
+        #map { height: 100%; width: 100%; }
+        
+        .map-header {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            right: 16px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            padding: 16px 20px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.12);
             display: flex;
             align-items: center;
-            margin-bottom: 20px;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .logo { font-size: 1.4rem; font-weight: 700; color: #1a1a1a; }
+        .logo span { color: #667eea; }
+        .current-time { font-size: 0.8rem; color: #666; }
+        
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: #f0f2f5;
+            border-radius: 20px;
         }
         .status-dot {
-            width: 12px;
-            height: 12px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            background: #34c759;
-            margin-right: 10px;
-            animation: pulse 2s infinite;
-        }
-        .status-dot.inactive {
             background: #8e8e93;
-            animation: none;
+            flex-shrink: 0;
         }
-        .status-dot.high-accuracy {
-            background: #34c759;
-            box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.7);
-            animation: pulse-accuracy 2s infinite;
+        .status-dot.active { background: #34c759; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .status-text { font-size: 0.85rem; font-weight: 600; color: #1a1a1a; }
+        
+        .main-content { padding: 24px 16px; display: flex; flex-direction: column; gap: 20px; }
+        
+        .info-card {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
         }
-        .status-dot.medium-accuracy {
-            background: #ffcc00;
-        }
-        .status-dot.low-accuracy {
-            background: #ff3b30;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        @keyframes pulse-accuracy {
-            0% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(52, 199, 89, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0); }
-        }
-        .status-text {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: #1a1a1a;
-        }
-        .accuracy-badge {
+        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .card-title { font-size: 1rem; font-weight: 700; color: #1a1a1a; }
+        
+        .source-badge {
             display: inline-block;
             padding: 4px 10px;
             border-radius: 12px;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 600;
-            margin-left: 10px;
+            text-transform: uppercase;
         }
-        .accuracy-badge.high {
-            background: #d4edda;
-            color: #155724;
+        .source-badge.gps { background: #d4edda; color: #155724; }
+        .source-badge.cell { background: #cce5ff; color: #004085; }
+        .source-badge.ip { background: #fff3cd; color: #856404; }
+        
+        .address-display {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 16px;
         }
-        .accuracy-badge.medium {
-            background: #fff3cd;
+        .address-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.85;
+            margin-bottom: 8px;
+        }
+        .address-value { font-size: 1.1rem; font-weight: 600; line-height: 1.5; }
+        
+        .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .info-item { padding: 14px; background: #f8f9fa; border-radius: 12px; }
+        .info-label { font-size: 0.7rem; color: #8e8e93; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .info-value { font-size: 0.9rem; color: #1a1a1a; font-weight: 600; }
+        
+        .accuracy-display {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 12px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 12px;
+        }
+        .accuracy-bar { flex: 1; height: 6px; background: #e5e5e5; border-radius: 3px; overflow: hidden; }
+        .accuracy-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+        .accuracy-fill.high { background: #34c759; }
+        .accuracy-fill.medium { background: #ffcc00; }
+        .accuracy-fill.low { background: #ff3b30; }
+        .accuracy-text { font-size: 0.8rem; color: #666; font-weight: 500; min-width: 60px; }
+        
+        .accuracy-warning {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border: 1px solid #ffc107;
+            border-radius: 12px;
+            padding: 14px;
+            margin-top: 12px;
+            font-size: 0.8rem;
             color: #856404;
-        }
-        .accuracy-badge.low {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        .location-info {
             display: none;
         }
-        .location-info.show {
-            display: block;
-        }
-        .info-item {
-            padding: 15px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        .info-item:last-child {
-            border-bottom: none;
-        }
-        .info-label {
-            font-size: 0.85rem;
-            color: #8e8e93;
-            margin-bottom: 5px;
-        }
-        .info-value {
-            font-size: 1rem;
-            color: #1a1a1a;
-            font-weight: 500;
-        }
-        .info-value.street {
-            font-size: 1.1rem;
-            color: #007aff;
-        }
-        .map-container {
-            margin: 20px 0;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        #map {
-            height: 300px;
-            width: 100%;
-        }
-        .map-links {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-            flex-wrap: wrap;
-        }
+        .accuracy-warning.show { display: block; }
+        
+        .map-links { display: flex; gap: 10px; margin-top: 16px; }
         .map-link-btn {
             flex: 1;
-            min-width: 120px;
-            padding: 10px 15px;
-            border-radius: 8px;
+            padding: 12px 16px;
+            border-radius: 12px;
             text-align: center;
             text-decoration: none;
             font-size: 0.85rem;
             font-weight: 600;
             transition: all 0.2s;
+            border: none;
         }
-        .map-link-btn.google {
-            background: #4285f4;
-            color: white;
-        }
-        .map-link-btn.osm {
-            background: #7ebc6f;
-            color: white;
-        }
-        .map-link-btn:hover {
-            opacity: 0.9;
-            transform: translateY(-2px);
-        }
+        .map-link-btn.google { background: #4285f4; color: white; }
+        .map-link-btn.osm { background: #7ebc6f; color: white; }
+        .map-link-btn:hover { transform: translateY(-2px); }
+        
+        .action-section { padding: 0 16px; }
         .btn-primary {
-            background: #007aff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 16px 32px;
-            border-radius: 12px;
+            padding: 16px 24px;
+            border-radius: 16px;
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
             width: 100%;
             transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
-        .btn-primary:hover {
-            background: #0056b3;
-        }
-        .btn-primary:active {
-            transform: scale(0.98);
-        }
-        .btn-primary:disabled {
-            background: #8e8e93;
-            cursor: not-allowed;
-        }
-        .btn-secondary {
-            background: #f0f0f0;
-            color: #1a1a1a;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 10px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 10px;
-            transition: all 0.2s;
-        }
-        .btn-secondary:hover {
-            background: #e0e0e0;
-        }
-        .loading {
-            text-align: center;
-            padding: 40px;
-            display: none;
-        }
-        .loading.show {
-            display: block;
-        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4); }
+        .btn-primary:disabled { background: #8e8e93; cursor: not-allowed; }
+        
+        .loading { text-align: center; padding: 30px; display: none; }
+        .loading.show { display: block; }
         .spinner {
             width: 40px;
             height: 40px;
-            border: 4px solid #f0f0f0;
-            border-top-color: #007aff;
+            border: 3px solid #e5e5e5;
+            border-top-color: #667eea;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin: 0 auto 15px;
+            margin: 0 auto 12px;
         }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        .error {
-            background: #fff2f2;
-            color: #ff3b30;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 15px;
-            display: none;
-        }
-        .error.show {
-            display: block;
-        }
-        .history-card {
-            background: white;
-            border-radius: 20px;
-            padding: 25px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-        .history-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #1a1a1a;
-            margin-bottom: 15px;
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { font-size: 0.9rem; color: #666; font-weight: 500; }
+        
+        .error { background: #fff2f2; color: #ff3b30; padding: 14px; border-radius: 12px; margin-top: 12px; font-size: 0.85rem; display: none; }
+        .error.show { display: block; }
+        
+        .history-list { display: flex; flex-direction: column; gap: 10px; }
         .history-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid #f0f0f0;
+            padding: 14px;
+            background: #f8f9fa;
+            border-radius: 12px;
         }
-        .history-item:last-child {
-            border-bottom: none;
-        }
-        .history-time {
-            font-size: 0.85rem;
-            color: #8e8e93;
-        }
-        .history-location {
-            font-size: 0.9rem;
-            color: #1a1a1a;
-            font-weight: 500;
-        }
-        .no-history {
-            text-align: center;
-            color: #8e8e93;
-            padding: 20px;
-            font-size: 0.9rem;
-        }
-        .source-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 6px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            margin-left: 8px;
-        }
-        .source-badge.gps {
-            background: #d1ecf1;
-            color: #0c5460;
-        }
-        .source-badge.ip {
-            background: #f8d7da;
-            color: #721c24;
-        }
+        .history-location { font-size: 0.9rem; color: #1a1a1a; font-weight: 600; }
+        .history-coords { font-size: 0.75rem; color: #8e8e93; }
+        .history-time { font-size: 0.75rem; color: #8e8e93; }
+        .no-history { text-align: center; color: #8e8e93; padding: 20px; font-size: 0.85rem; }
+        
+        .location-info { display: none; }
+        .location-info.show { display: block; }
+        
         @media (max-width: 600px) {
-            .map-links {
-                flex-direction: column;
-            }
-            .map-link-btn {
-                width: 100%;
-            }
+            .map-section { height: 35vh; min-height: 250px; }
+            .map-header { flex-wrap: wrap; }
+            .info-grid { grid-template-columns: 1fr; }
+            .map-links { flex-direction: column; }
+            .main-content { padding: 16px; gap: 16px; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">Time<span>Mark</span></div>
-            <div class="current-time" id="currentTime"></div>
+    <div class="app-container">
+        <div class="map-section">
+            <div id="map"></div>
+            <div class="map-header">
+                <div class="logo">Time<span>Mark</span></div>
+                <div class="status-pill">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span class="status-text" id="statusText">Not Set</span>
+                </div>
+                <div class="current-time" id="currentTime"></div>
+            </div>
         </div>
 
-        <div class="status-card">
-            <div class="status-indicator">
-                <div class="status-dot inactive" id="statusDot"></div>
-                <div class="status-text" id="statusText">Location Not Set</div>
-                <span id="accuracyBadge" class="accuracy-badge" style="display: none;"></span>
+        <div class="main-content">
+            <div class="action-section">
+                <button class="btn-primary" id="getLocationBtn" onclick="getLocation()">
+                    📍 Get My Location
+                </button>
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <div class="loading-text" id="loadingText">Getting your location...</div>
+                </div>
+                <div class="error" id="error"></div>
             </div>
-
-            <button class="btn-primary" id="getLocationBtn" onclick="getLocation()">
-                📍 Get My Location
-            </button>
-
-            <div class="loading" id="loading">
-                <div class="spinner"></div>
-                <div id="loadingText">Getting your location...</div>
-            </div>
-
-            <div class="error" id="error"></div>
 
             <div class="location-info" id="locationInfo">
-                <div class="info-item">
-                    <div class="info-label">Street Address</div>
-                    <div class="info-value street" id="streetAddress">-</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Neighborhood</div>
-                    <div class="info-value" id="neighbourhood">-</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">City</div>
-                    <div class="info-value" id="city">-</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Region / State</div>
-                    <div class="info-value" id="region">-</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Country</div>
-                    <div class="info-value" id="country">-</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Postal Code</div>
-                    <div class="info-value" id="postcode">-</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Coordinates <span id="sourceBadge" class="source-badge"></span></div>
-                    <div class="info-value" id="coordinates">-</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Accuracy</div>
-                    <div class="info-value" id="accuracy">-</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Marked At</div>
-                    <div class="info-value" id="markedAt">-</div>
+                <div class="info-card">
+                    <div class="address-display">
+                        <div class="address-label">Current Location</div>
+                        <div class="address-value" id="fullAddress">-</div>
+                    </div>
+                    <div class="map-links">
+                        <a id="googleMapsLink" href="#" target="_blank" class="map-link-btn google">Google Maps</a>
+                        <a id="osmLink" href="#" target="_blank" class="map-link-btn osm">OpenStreetMap</a>
+                    </div>
                 </div>
 
-                <!-- Interactive Map -->
-                <div class="map-container">
-                    <div id="map"></div>
+                <div class="info-card">
+                    <div class="card-header">
+                        <div class="card-title">Location Details</div>
+                        <span class="source-badge" id="sourceBadge">-</span>
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-item" style="grid-column: span 2;">
+                            <div class="info-label">Street Address</div>
+                            <div class="info-value" id="streetAddress" style="font-size: 0.85rem;">-</div>
+                        </div>
+                        <div class="info-item" style="grid-column: span 2;">
+                            <div class="info-label">Neighborhood / Area</div>
+                            <div class="info-value" id="neighbourhood" style="font-size: 0.85rem;">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">City</div>
+                            <div class="info-value" id="city">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Region</div>
+                            <div class="info-value" id="region">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Country</div>
+                            <div class="info-value" id="country">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Postal Code</div>
+                            <div class="info-value" id="postcode">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Coordinates</div>
+                            <div class="info-value" id="coordinates">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Marked At</div>
+                            <div class="info-value" id="markedAt">-</div>
+                        </div>
+                    </div>
+                    <div class="accuracy-display">
+                        <span style="font-size: 0.8rem; color: #666;">Accuracy:</span>
+                        <div class="accuracy-bar">
+                            <div class="accuracy-fill" id="accuracyFill" style="width: 0%"></div>
+                        </div>
+                        <span class="accuracy-text" id="accuracyText">-</span>
+                    </div>
+                    <div class="accuracy-warning" id="accuracyWarning">
+                        ⚠️ <strong>Low Accuracy:</strong> IP-based location may be inaccurate (5-50km). Enable location services for better results.
+                    </div>
                 </div>
-
-                <!-- Map Links -->
-                <div class="map-links">
-                    <a id="googleMapsLink" href="#" target="_blank" class="map-link-btn google">
-                        🗺️ Google Maps
-                    </a>
-                    <a id="osmLink" href="#" target="_blank" class="map-link-btn osm">
-                        🌍 OpenStreetMap
-                    </a>
-                </div>
-
-                <button class="btn-secondary" onclick="getLocation()">
-                    🔄 Update Location
-                </button>
             </div>
-        </div>
 
-        <div class="history-card">
-            <div class="history-title">Location History</div>
-            <div id="historyList">
-                <div class="no-history">No location history yet</div>
+            <div class="info-card">
+                <div class="card-title" style="margin-bottom: 16px;">Location History</div>
+                <div class="history-list" id="historyList">
+                    <div class="no-history">No location history yet</div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <script>
         let locationHistory = [];
         let map = null;
         let marker = null;
         let accuracyCircle = null;
-        let currentLat = null;
-        let currentLon = null;
+        let currentConnectionType = 'unknown';
 
         function updateCurrentTime() {
             const now = new Date();
@@ -419,187 +328,179 @@
         setInterval(updateCurrentTime, 1000);
         updateCurrentTime();
 
-        function initMap(lat, lon, accuracy) {
-            currentLat = lat;
-            currentLon = lon;
-
-            // Initialize map if not exists
-            if (!map) {
-                map = L.map('map').setView([lat, lon], 17);
-                
-                // Add OpenStreetMap tiles
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors',
-                    maxZoom: 19
-                }).addTo(map);
-            } else {
-                map.setView([lat, lon], 17);
+        function detectConnectionType() {
+            if (navigator.connection) {
+                const conn = navigator.connection;
+                const effectiveType = conn.effectiveType || 'unknown';
+                const isMobile = ['4g', '3g', '2g', 'slow-2g'].includes(effectiveType);
+                currentConnectionType = isMobile ? 'mobile' : 'wifi';
+                return { effectiveType, isMobile };
             }
-
-            // Remove existing marker and accuracy circle
-            if (marker) {
-                map.removeLayer(marker);
-            }
-            if (accuracyCircle) {
-                map.removeLayer(accuracyCircle);
-            }
-
-            // Add custom marker with popup
-            marker = L.marker([lat, lon]).addTo(map);
-            marker.bindPopup(`
-                <b>Your Location</b><br>
-                Lat: ${lat.toFixed(6)}<br>
-                Lon: ${lon.toFixed(6)}<br>
-                Accuracy: ±${Math.round(accuracy)}m
-            `).openPopup();
-
-            // Add accuracy circle
-            accuracyCircle = L.circle([lat, lon], {
-                radius: accuracy,
-                color: '#007aff',
-                fillColor: '#007aff',
-                fillOpacity: 0.1,
-                weight: 2
-            }).addTo(map);
-
-            // Update map links
-            updateMapLinks(lat, lon);
+            const isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            currentConnectionType = isMobile ? 'mobile' : 'unknown';
+            return { effectiveType: 'unknown', isMobile };
         }
 
-        function updateMapLinks(lat, lon) {
-            // Google Maps link
-            document.getElementById('googleMapsLink').href = 
-                `https://www.google.com/maps?q=${lat},${lon}&z=17`;
-            
-            // OpenStreetMap link
-            document.getElementById('osmLink').href = 
-                `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=17/${lat}/${lon}`;
-        }
-
-        function getAccuracyLevel(accuracy) {
-            if (accuracy <= 20) return { level: 'high', label: 'High Accuracy', class: 'high' };
-            if (accuracy <= 100) return { level: 'medium', label: 'Medium Accuracy', class: 'medium' };
-            return { level: 'low', label: 'Low Accuracy', class: 'low' };
-        }
-
-        function updateAccuracyDisplay(accuracy) {
-            const accuracyInfo = document.getElementById('accuracy');
-            const accuracyBadge = document.getElementById('accuracyBadge');
-            const statusDot = document.getElementById('statusDot');
-            
-            accuracyInfo.textContent = `±${Math.round(accuracy)} meters`;
-            
-            const accLevel = getAccuracyLevel(accuracy);
-            accuracyBadge.textContent = accLevel.label;
-            accuracyBadge.className = `accuracy-badge ${accLevel.class}`;
-            accuracyBadge.style.display = 'inline-block';
-            
-            // Update status dot color based on accuracy
-            statusDot.classList.remove('high-accuracy', 'medium-accuracy', 'low-accuracy');
-            statusDot.classList.add(`${accLevel.level}-accuracy`);
-        }
-
-        function getLocation() {
-            const btn = document.getElementById('getLocationBtn');
-            const loading = document.getElementById('loading');
-            const loadingText = document.getElementById('loadingText');
-            const error = document.getElementById('error');
-            const locationInfo = document.getElementById('locationInfo');
+function getLocation() {
+            var btn = document.getElementById('getLocationBtn');
+            var loading = document.getElementById('loading');
+            var loadingText = document.getElementById('loadingText');
+            var error = document.getElementById('error');
+            var locationInfo = document.getElementById('locationInfo');
+            var accuracyWarning = document.getElementById('accuracyWarning');
 
             error.classList.remove('show');
             locationInfo.classList.remove('show');
+            accuracyWarning.classList.remove('show');
 
-            // Try browser geolocation first with maximum accuracy settings
+            var connection = detectConnectionType();
+            var isMobileData = connection.isMobile;
+
             if (navigator.geolocation) {
                 btn.style.display = 'none';
                 loading.classList.add('show');
-                loadingText.textContent = 'Getting precise location...';
+                loadingText.textContent = isMobileData ? 'Getting GPS location...' : 'Getting precise location...';
+
+                var timeout = isMobileData ? 25000 : 15000;
 
                 navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                        const lat = position.coords.latitude;
-                        const lon = position.coords.longitude;
-                        const accuracy = position.coords.accuracy;
+                    function(position) {
+                        var lat = position.coords.latitude;
+                        var lon = position.coords.longitude;
+                        var accuracy = position.coords.accuracy;
 
-                        loadingText.textContent = 'Fetching street address...';
+                        loadingText.textContent = 'Fetching address...';
 
-                        try {
-                            const response = await fetch(
-                                `/api/location/by-coordinates?latitude=${lat}&longitude=${lon}`
-                            );
-                            const data = await response.json();
+                        fetch('/api/location/by-coordinates?latitude=' + lat + '&longitude=' + lon)
+                            .then(function(response) { return response.json(); })
+                            .then(function(data) {
+                                loading.classList.remove('show');
+                                btn.style.display = 'block';
 
-                            loading.classList.remove('show');
+                                if (data.success) {
+                                    displayLocation(data.data, lat, lon, accuracy, 'GPS');
+                                    addToHistory(data.data.street_address || data.data.city || 'Unknown', lat, lon, 'GPS');
+                                } else {
+                                    displayLocation({
+                                        street: '', city: 'Unknown', state: '', country: '', postcode: ''
+                                    }, lat, lon, accuracy, 'GPS');
+                                    addToHistory('Coordinates Only', lat, lon, 'GPS');
+                                }
+                            })
+                            .catch(function(err) {
+                                loading.classList.remove('show');
+                                btn.style.display = 'block';
+                                displayLocation({
+                                    street: '', city: 'Unknown', state: '', country: '', postcode: ''
+                                }, lat, lon, accuracy, 'GPS');
+                                addToHistory('Coordinates Only', lat, lon, 'GPS');
+                            });
+                    },
+                    function(err) {
+                        console.log('Geolocation error:', err.message);
+                        loading.classList.remove('show');
+                        
+                        if (err.code === err.PERMISSION_DENIED) {
+                            error.innerHTML = '❌ Location permission denied. Please enable location access in your browser settings.';
+                            error.classList.add('show');
                             btn.style.display = 'block';
-
-                            if (data.success) {
-                                displayLocation(data.data, lat, lon, accuracy, 'GPS');
-                                addToHistory(data.data.street_address || data.data.city || 'Unknown', lat, lon, 'GPS');
-                            } else {
-                                getIpLocation();
-                            }
-                        } catch (err) {
-                            console.error('Reverse geocoding failed:', err);
-                            loading.classList.remove('show');
-                            btn.style.display = 'block';
+                        } else if (err.code === err.POSITION_UNAVAILABLE) {
+                            loadingText.textContent = 'Location unavailable, trying IP...';
+                            setTimeout(function() { getIpLocation(); }, 1000);
+                        } else if (err.code === err.TIMEOUT) {
+                            loadingText.textContent = 'GPS timeout, retrying...';
+                            setTimeout(function() { retryGeolocation(); }, 1500);
+                        } else if (err.message && err.message.indexOf('secure') !== -1) {
+                            loadingText.textContent = 'Secure connection required, using IP location...';
+                            setTimeout(function() { getIpLocation(); }, 1000);
+                        } else {
                             getIpLocation();
                         }
                     },
-                    (err) => {
-                        console.log('Geolocation failed, using IP fallback:', err.message);
-                        loading.classList.remove('show');
-                        loadingText.textContent = 'GPS unavailable, using IP location...';
-                        getIpLocation();
-                    },
                     {
-                        enableHighAccuracy: true,  // Use GPS for maximum accuracy
-                        timeout: 15000,            // Wait up to 15 seconds
-                        maximumAge: 0              // Don't use cached position
+                        enableHighAccuracy: true,
+                        timeout: timeout,
+                        maximumAge: 60000
                     }
                 );
             } else {
-                // No geolocation support, use IP directly
-                loadingText.textContent = 'GPS not supported, using IP location...';
                 getIpLocation();
             }
         }
 
+        function retryGeolocation() {
+            var loading = document.getElementById('loading');
+            var loadingText = document.getElementById('loadingText');
+            var btn = document.getElementById('getLocationBtn');
+
+            loading.classList.add('show');
+            loadingText.textContent = 'Retrying GPS...';
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    var lat = position.coords.latitude;
+                    var lon = position.coords.longitude;
+                    var accuracy = position.coords.accuracy;
+
+                    loading.classList.remove('show');
+                    btn.style.display = 'block';
+
+                    fetch('/api/location/by-coordinates?latitude=' + lat + '&longitude=' + lon)
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) {
+                            if (data.success) {
+                                displayLocation(data.data, lat, lon, accuracy, 'GPS');
+                                addToHistory(data.data.street_address || data.data.city || 'Unknown', lat, lon, 'GPS');
+                            } else {
+                                displayLocation({ street: '', city: 'Unknown', state: '', country: '', postcode: '' }, lat, lon, accuracy, 'GPS');
+                                addToHistory('Coordinates Only', lat, lon, 'GPS');
+                            }
+                        })
+                        .catch(function() {
+                            displayLocation({ street: '', city: 'Unknown', state: '', country: '', postcode: '' }, lat, lon, accuracy, 'GPS');
+                            addToHistory('Coordinates Only', lat, lon, 'GPS');
+                        });
+                },
+                function() {
+                    loading.classList.remove('show');
+                    getIpLocation();
+                },
+                { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
+            );
+        }
+
         async function getIpLocation() {
-            const loading = document.getElementById('loading');
-            const loadingText = document.getElementById('loadingText');
-            const error = document.getElementById('error');
-            const btn = document.getElementById('getLocationBtn');
-            const locationInfo = document.getElementById('locationInfo');
+            var loading = document.getElementById('loading');
+            var loadingText = document.getElementById('loadingText');
+            var error = document.getElementById('error');
+            var btn = document.getElementById('getLocationBtn');
+            var accuracyWarning = document.getElementById('accuracyWarning');
 
             loading.classList.add('show');
             loadingText.textContent = 'Getting location from IP...';
 
             try {
-                // Use Laravel backend route instead of direct external call (fixes HTTPS issues)
-                const response = await fetch('/api/location/by-ip');
-                const data = await response.json();
-
-                console.log('IP API Response:', data);
+                var response = await fetch('/api/location/by-ip');
+                var data = await response.json();
 
                 loading.classList.remove('show');
 
                 if (data.success) {
-                    const ipData = data.data;
-                    const locationData = {
-                        address: `${ipData.city}, ${ipData.region}, ${ipData.country}`,
-                        street_address: '',
+                    var ipData = data.data;
+                    var locationData = {
                         street: '',
-                        house_number: '',
-                        neighbourhood: '',
                         city: ipData.city,
                         state: ipData.region,
                         country: ipData.country,
-                        country_code: ipData.countryCode,
                         postcode: ipData.zip
                     };
 
-                    // IP-based location has lower accuracy (typically 1-50 km)
-                    const ipAccuracy = 5000; // 5km radius
+                    var isMobile = currentConnectionType === 'mobile';
+                    var ipAccuracy = isMobile ? 3000 : 1500;
+
+                    if (isMobile) {
+                        accuracyWarning.classList.add('show');
+                    }
 
                     displayLocation(locationData, ipData.latitude, ipData.longitude, ipAccuracy, 'IP');
                     addToHistory(ipData.city || 'Unknown', ipData.latitude, ipData.longitude, 'IP');
@@ -607,12 +508,11 @@
                     btn.style.display = 'block';
                     btn.textContent = '🔄 Update Location';
                 } else {
-                    error.textContent = '❌ Unable to get location from IP';
+                    error.textContent = '❌ ' + (data.message || 'Unable to get location. Please enable location services for better accuracy.');
                     error.classList.add('show');
                     btn.style.display = 'block';
                 }
             } catch (err) {
-                console.error('Error:', err);
                 loading.classList.remove('show');
                 error.textContent = '❌ Error: ' + err.message;
                 error.classList.add('show');
@@ -621,70 +521,128 @@
         }
 
         function displayLocation(data, lat, lon, accuracy, source) {
-            document.getElementById('statusDot').classList.remove('inactive');
+            document.getElementById('statusDot').classList.add('active');
             document.getElementById('statusText').textContent = 'Location Active';
             document.getElementById('locationInfo').classList.add('show');
 
-            // Street address
-            const streetAddress = data.street_address || data.street || 'Not available';
-            document.getElementById('streetAddress').textContent = streetAddress;
+            // Build full address with street
+            var addressParts = [];
+            if (data.street_address) addressParts.push(data.street_address);
+            else if (data.street) addressParts.push(data.street);
+            if (data.neighbourhood) addressParts.push(data.neighbourhood);
+            if (data.city) addressParts.push(data.city);
+            if (data.region) addressParts.push(data.region);
+            if (data.country) addressParts.push(data.country);
             
-            // House number display
-            if (data.house_number && data.street) {
-                document.getElementById('streetAddress').textContent = 
-                    `${data.house_number} ${data.street}`;
-            }
+            var fullAddress = addressParts.join(', ');
+            document.getElementById('fullAddress').textContent = fullAddress || '-';
 
-            document.getElementById('neighbourhood').textContent = 
-                data.neighbourhood || data.quarter || '-';
+            // Street address field
+            var streetAddr = data.street_address || data.street || data.house_number || '-';
+            document.getElementById('streetAddress').textContent = streetAddr;
+            
+            // Neighbourhood
+            var neighbourhood = data.neighbourhood || data.quarter || data.suburb || '-';
+            document.getElementById('neighbourhood').textContent = neighbourhood;
+
+            // Show individual details
             document.getElementById('city').textContent = data.city || '-';
             document.getElementById('region').textContent = data.state || data.region || '-';
             document.getElementById('country').textContent = data.country || '-';
             document.getElementById('postcode').textContent = data.postcode || '-';
-            document.getElementById('coordinates').textContent = 
-                `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+            document.getElementById('coordinates').textContent = lat.toFixed(6) + ', ' + lon.toFixed(6);
             document.getElementById('markedAt').textContent = new Date().toLocaleString();
 
-            // Source badge
-            const sourceBadge = document.getElementById('sourceBadge');
-            sourceBadge.textContent = source;
-            sourceBadge.className = `source-badge ${source.toLowerCase()}`;
+            document.getElementById('sourceBadge').textContent = source;
+            document.getElementById('sourceBadge').className = 'source-badge ' + source.toLowerCase();
 
-            // Update accuracy display
             updateAccuracyDisplay(accuracy);
 
-            // Initialize map
-            setTimeout(() => {
-                initMap(lat, lon, accuracy);
-            }, 100);
+            document.getElementById('googleMapsLink').href = 'https://www.google.com/maps?q=' + lat + ',' + lon;
+            document.getElementById('osmLink').href = 'https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lon + '#map=15/' + lat + '/' + lon;
+
+            setTimeout(function() { initMap(lat, lon, accuracy); }, 100);
+        }
+
+        function updateAccuracyDisplay(accuracy) {
+            var fill = document.getElementById('accuracyFill');
+            var text = document.getElementById('accuracyText');
+            var warning = document.getElementById('accuracyWarning');
+            var percent = 100;
+            var level = 'High';
+            var color = '#34c759';
+
+            if (accuracy <= 100) {
+                percent = 100;
+                level = 'High (' + Math.round(accuracy) + 'm)';
+                color = '#34c759';
+            } else if (accuracy <= 1000) {
+                percent = 60;
+                level = 'Medium (' + Math.round(accuracy) + 'm)';
+                color = '#ffcc00';
+            } else {
+                percent = 30;
+                level = 'Low (' + Math.round(accuracy) + 'm)';
+                color = '#ff3b30';
+            }
+
+            fill.className = 'accuracy-fill ' + (percent === 100 ? 'high' : percent === 60 ? 'medium' : 'low');
+            fill.style.width = percent + '%';
+            fill.style.background = color;
+            text.textContent = level;
+
+            if (accuracy > 1000) {
+                warning.classList.add('show');
+            } else {
+                warning.classList.remove('show');
+            }
+        }
+
+        function initMap(lat, lon, accuracy) {
+            if (map) {
+                map.remove();
+            }
+            
+            var zoom = accuracy <= 100 ? 16 : accuracy <= 1000 ? 14 : 11;
+            map = L.map('map').setView([lat, lon], zoom);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+            
+            marker = L.marker([lat, lon]).addTo(map);
+            
+            if (accuracy > 0 && accuracy < 5000) {
+                var color = accuracy <= 100 ? '#34c759' : accuracy <= 1000 ? '#ffcc00' : '#ff3b30';
+                accuracyCircle = L.circle([lat, lon], {
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.2,
+                    radius: accuracy
+                }).addTo(map);
+            }
         }
 
         function addToHistory(location, lat, lon, source) {
-            const time = new Date().toLocaleTimeString();
-            locationHistory.unshift({ location, lat, lon, time, source });
+            var time = new Date().toLocaleTimeString();
+            locationHistory.unshift({ location: location, lat: lat, lon: lon, time: time, source: source });
             if (locationHistory.length > 5) locationHistory.pop();
             renderHistory();
         }
 
         function renderHistory() {
-            const list = document.getElementById('historyList');
+            var list = document.getElementById('historyList');
             if (locationHistory.length === 0) {
                 list.innerHTML = '<div class="no-history">No location history yet</div>';
                 return;
             }
 
-            list.innerHTML = locationHistory.map(item => `
-                <div class="history-item">
-                    <div>
-                        <div class="history-location">
-                            ${item.location || 'Unknown'}
-                            <span class="source-badge ${item.source?.toLowerCase() || 'ip'}">${item.source || 'IP'}</span>
-                        </div>
-                        <div class="history-time">${item.lat.toFixed(4)}, ${item.lon.toFixed(4)}</div>
-                    </div>
-                    <div class="history-time">${item.time}</div>
-                </div>
-            `).join('');
+            var html = '';
+            for (var i = 0; i < locationHistory.length; i++) {
+                var item = locationHistory[i];
+                html += '<div class="history-item"><div><div class="history-location">' + (item.location || 'Unknown') + '</div><div class="history-coords">' + item.lat.toFixed(4) + ', ' + item.lon.toFixed(4) + '</div></div><div class="history-time">' + item.time + '</div></div>';
+            }
+            list.innerHTML = html;
         }
 
         window.addEventListener('load', function() {
